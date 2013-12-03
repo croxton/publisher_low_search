@@ -31,7 +31,7 @@ class Publisher_low_search_ext {
     public $docs_url        = '';
     public $name            = 'Publisher - Low Search Support';
     public $settings_exist  = 'n';
-    public $version         = '1.0.1';
+    public $version         = '1.0.2';
 
     private $table          = 'low_search_indexes';
     private $EE;
@@ -92,6 +92,9 @@ class Publisher_low_search_ext {
 
         foreach ($fields as $k => $field_id)
         {
+            // Skip non-numeric settings
+            if ( !is_numeric($field_id)) continue;
+
             $field_names[] = ($field_id == 0) ? 't.title AS field_id_0' : 'd.field_id_'.$field_id;
         }
 
@@ -134,9 +137,146 @@ class Publisher_low_search_ext {
         // Get it
         // --------------------------------------
 
-        $query = $this->EE->db->get()->result_array();
+        $entries = $this->EE->db->get()->result_array();
 
-        return $query;
+        // --------------------------------------
+        // Get category info for these entries
+        // --------------------------------------
+
+        if ($entry_cats = $this->get_entry_categories($entries))
+        {
+            // add the categories to the index_entries rows
+            foreach ($entry_cats AS $entry_id => $cats)
+            {
+                $entries[$entry_id] += $cats;
+            }
+        }
+
+        // ee()->publisher_log->to_file($entries);
+
+        return $entries;
+    }
+
+    /**
+     * Get categories for entries
+     *
+     * @access     public
+     * @param      mixed [int|array]
+     * @param      mixed [null|array]
+     * @return     array
+     */
+    private function get_entry_categories($entries, $cat_ids = NULL)
+    {
+        // Prep output
+        $cats = array();
+        $entry_ids = array_keys($entries);
+
+        // --------------------------------------
+        // Two options: either get cats by their entry id,
+        // or get details for given cat ids.
+        // Compose query based on those two options.
+        // --------------------------------------
+
+        $ok     = FALSE;
+        $select = array('c.*');
+        $joins  = array();
+        $where  = array();
+
+        if (is_array($entry_ids) && ! empty($entry_ids))
+        {
+            // Option 1: get categories by given entry_ids
+            $ok = TRUE;
+            $select[] = 'cp.entry_id';
+            $joins[] = array('category_posts cp', 'c.cat_id = cp.cat_id', 'inner');
+            $where['cp.entry_id'] = $entry_ids;
+        }
+        elseif (is_array($cat_ids) && ! empty($cat_ids))
+        {
+            // Option 2: get categories by given cat_ids,
+            // hardcode entry ID to be compatible
+            $ok = TRUE;
+            $select[] = "'{$entry_ids}' AS `entry_id`";
+            $where['c.cat_id'] = $cat_ids;
+        }
+
+        // Not ok? Bail out
+        if ( ! $ok) return $cats;
+
+        // Start query
+        ee()->db->select($select, FALSE);
+        ee()->db->from('publisher_categories c');
+
+        // Process joins
+        foreach ($joins AS $join)
+        {
+            list($table, $on, $type) = $join;
+            ee()->db->join($table, $on, $type);
+        }
+
+        // Process wheres
+        foreach ($where AS $key => $val)
+        {
+            ee()->db->where_in($key, $val);
+        }
+
+        // Execute query
+        $query = ee()->db->get();
+
+        // ee()->publisher_log->to_file(ee()->db->last_query());
+        $languages = ee()->publisher_model->languages;
+
+        // --------------------------------------
+        // Done with the query; loop through results
+        // --------------------------------------
+        
+        // Relevant non-custom fields
+        $fields = array('cat_name', 'cat_description');
+
+        foreach ($query->result_array() AS $row)
+        {
+            // Loop through each result and populate the output
+            foreach ($row AS $key => $val)
+            {
+                // Skip non-valid fields
+                if ( ! in_array($key, $fields) && ! preg_match('/^field_id_(\d+)$/', $key, $match)) continue;
+
+                // We're OK! Go on with composing the right key:
+                // Either the name or description or custom field ID
+                $cat_field = $match ? $match[1] : $key;
+
+                foreach (array(PUBLISHER_STATUS_OPEN, PUBLISHER_STATUS_DRAFT) as $status)
+                {
+                    $category = ee()->publisher_category->get_translations($row['cat_id'], $row['group_id'], $status);
+
+                    // ee()->publisher_log->to_file('========== $category ==========');
+                    // ee()->publisher_log->to_file($category);
+
+                    foreach ($languages as $lang_id => $language)
+                    {
+                        $val = isset($category[$lang_id]->$cat_field) ? $category[$lang_id]->$cat_field : FALSE;
+
+                        // ee()->publisher_log->to_file($val);
+
+                        // Use that as the key in the array to return
+                        if ($val)
+                        {
+                            $cats[$row['entry_id']]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --------------------------------------
+        // Focus on the single one if one entry_id is given
+        // --------------------------------------
+
+        if ( ! is_array($entry_ids))
+        {
+            $cats = $cats[$entry_ids];
+        }
+
+        return $cats;
     }
 
     public function low_search_excerpt($entry_ids, $row, $eid)
