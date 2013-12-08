@@ -124,7 +124,7 @@ class Publisher_low_search_ext {
 
         if ($start !== FALSE && is_numeric($start))
         {
-            $this->EE->db->limit($batch_size, $start);
+            // $this->EE->db->limit($batch_size, $start);
         }
 
         // --------------------------------------
