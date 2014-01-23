@@ -281,27 +281,34 @@ class Publisher_low_search_ext {
 
     public function low_search_excerpt($entry_ids, $row, $eid)
     {
-        // If its not the default language, get the translated value of the field to update
-        // the excerpt string.
-        if ($this->EE->publisher_lib->lang_id != $this->EE->publisher_lib->default_lang_id)
-        {
-            $field_name = ($eid == 0) ? 'title' : 'field_id_'.$eid;
+        // Get the excerpt no matter what since low search displays nothing otherwise
+        $field_name = ($eid == 0) ? 'title' : 'field_id_'.$eid;
 
+        $excerpt = $this->EE->publisher_model->get_field_value(
+            $row['entry_id'], 
+            $field_name, 
+            $this->EE->publisher_lib->status, 
+            $this->EE->publisher_lib->lang_id
+        );
+
+        // ensure excerpt is a string
+        $excerpt = is_array($excerpt) ? '' : $excerpt;
+
+        // Try to find the default data
+        if(ee()->publisher_setting->show_fallback() && $excerpt == "")
+        {
             $excerpt = $this->EE->publisher_model->get_field_value(
                 $row['entry_id'], 
                 $field_name, 
                 $this->EE->publisher_lib->status, 
-                $this->EE->publisher_lib->lang_id
+                $this->EE->publisher_lib->default_lang_id
             );
 
             // ensure excerpt is a string
             $excerpt = is_array($excerpt) ? '' : $excerpt;
-
-            // Might need to change to return $excerpt;
-            return array($excerpt, FALSE);
         }
 
-        return '';
+        return $excerpt;
     }
 
     /**
