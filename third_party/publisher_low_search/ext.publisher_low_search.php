@@ -11,7 +11,7 @@
  * @since       Version 2.0
  * @filesource
  */
- 
+
 // ------------------------------------------------------------------------
 
 /**
@@ -25,17 +25,17 @@
  */
 
 class Publisher_low_search_ext {
-    
+
     public $settings        = array();
     public $description     = 'Adds Low Search support to Publisher';
     public $docs_url        = '';
     public $name            = 'Publisher - Low Search Support';
     public $settings_exist  = 'n';
-    public $version         = '1.0.2';
+    public $version         = '1.0.3';
 
     private $table          = 'low_search_indexes';
     private $EE;
-    
+
     /**
      * Constructor
      *
@@ -56,7 +56,7 @@ class Publisher_low_search_ext {
     public function low_search_update_index($params, $entry = array())
     {
         // If batch indexing, just take the params from the entry row
-        if (isset($this->cache['batch_indexing'])) 
+        if (isset($this->cache['batch_indexing']) && isset($entry['publisher_lang_id']))
         {
             $params['publisher_lang_id'] = $entry['publisher_lang_id'];
             $params['publisher_status'] = $entry['publisher_status'];
@@ -66,7 +66,7 @@ class Publisher_low_search_ext {
         {
             // This isn't set yet when indexing via the ajax method, so just force to Open
             $status = isset($this->EE->publisher_lib->save_status) ? $this->EE->publisher_lib->save_status : PUBLISHER_STATUS_OPEN;
-            
+
             $params['publisher_lang_id'] = $this->EE->publisher_lib->lang_id;
             $params['publisher_status']  = $status;
         }
@@ -88,7 +88,7 @@ class Publisher_low_search_ext {
     {
         $this->cache['batch_indexing'] = TRUE;
 
-        $field_names = array('t.entry_id', 't.channel_id', 't.publisher_lang_id', 't.publisher_status');
+        $field_names = array('t.entry_id', 't.channel_id');
 
         foreach ($fields as $k => $field_id)
         {
@@ -101,13 +101,25 @@ class Publisher_low_search_ext {
         // --------------------------------------
         // Build query
         // --------------------------------------
-        $fields[] = 't.publisher_lang_id';
-        $fields[] = 't.publisher_status';
 
-        $this->EE->db->select(implode(', ', $field_names))
-                     ->from('publisher_titles t')
-                     ->join('publisher_data d', 't.entry_id = d.entry_id AND t.publisher_lang_id = d.publisher_lang_id AND t.publisher_status = d.publisher_status', 'inner')
+        // @todo - how do we handle a collection that has a combination of ignored and not ignored channels?
+        if (count($channel_ids) == 1 && $this->EE->publisher_model->is_ignored_channel($channel_ids[0]))
+        {
+            $this->EE->db->select(implode(', ', $field_names))
+                     ->from('channel_titles t')
+                     ->join('channel_data d', 't.entry_id = d.entry_id', 'inner')
                      ->where_in('t.channel_id', $channel_ids);
+        }
+        else
+        {
+            $field_names[] = 't.publisher_lang_id';
+            $field_names[] = 't.publisher_status';
+
+            $this->EE->db->select(implode(', ', $field_names))
+                         ->from('publisher_titles t')
+                         ->join('publisher_data d', 't.entry_id = d.entry_id AND t.publisher_lang_id = d.publisher_lang_id AND t.publisher_status = d.publisher_status', 'inner')
+                         ->where_in('t.channel_id', $channel_ids);
+        }
 
         // --------------------------------------
         // Limit to given entries
@@ -228,7 +240,7 @@ class Publisher_low_search_ext {
         // --------------------------------------
         // Done with the query; loop through results
         // --------------------------------------
-        
+
         // Relevant non-custom fields
         $fields = array('cat_name', 'cat_description');
 
@@ -285,9 +297,9 @@ class Publisher_low_search_ext {
         $field_name = ($eid == 0) ? 'title' : 'field_id_'.$eid;
 
         $excerpt = $this->EE->publisher_model->get_field_value(
-            $row['entry_id'], 
-            $field_name, 
-            $this->EE->publisher_lib->status, 
+            $row['entry_id'],
+            $field_name,
+            $this->EE->publisher_lib->status,
             $this->EE->publisher_lib->lang_id
         );
 
@@ -298,9 +310,9 @@ class Publisher_low_search_ext {
         if(ee()->publisher_setting->show_fallback() && $excerpt == "")
         {
             $excerpt = $this->EE->publisher_model->get_field_value(
-                $row['entry_id'], 
-                $field_name, 
-                $this->EE->publisher_lib->status, 
+                $row['entry_id'],
+                $field_name,
+                $this->EE->publisher_lib->status,
                 $this->EE->publisher_lib->default_lang_id
             );
 
@@ -320,7 +332,7 @@ class Publisher_low_search_ext {
     {
         // Setup custom settings in this array.
         $this->settings = array();
-        
+
         // Add new hooks
         $ext_template = array(
             'class'    => __CLASS__,
@@ -340,11 +352,11 @@ class Publisher_low_search_ext {
         foreach($extensions as $extension)
         {
             $this->EE->db->insert('extensions', array_merge($ext_template, $extension));
-        }       
+        }
 
         $this->EE->load->dbforge();
 
-        if ($this->EE->db->table_exists($this->table) AND ! $this->EE->db->field_exists('publisher_lang_id', $this->table)) 
+        if ($this->EE->db->table_exists($this->table) AND ! $this->EE->db->field_exists('publisher_lang_id', $this->table))
         {
             $this->EE->db->query("ALTER TABLE `{$this->EE->db->dbprefix}{$this->table}` ADD COLUMN `publisher_lang_id` int(4) NOT NULL DEFAULT {$this->EE->publisher_lib->default_lang_id} AFTER `site_id`");
             $this->EE->db->query("ALTER TABLE `{$this->EE->db->dbprefix}{$this->table}` ADD COLUMN `publisher_status` varchar(24) NULL DEFAULT '". PUBLISHER_STATUS_OPEN ."' AFTER `publisher_lang_id`");
@@ -352,10 +364,10 @@ class Publisher_low_search_ext {
             $this->EE->db->query("ALTER TABLE `{$this->EE->db->dbprefix}{$this->table}` DROP PRIMARY KEY");
             $this->EE->db->query("ALTER TABLE `{$this->EE->db->dbprefix}{$this->table}` ADD PRIMARY KEY (collection_id, entry_id, publisher_lang_id, publisher_status)");
         }
-    }   
+    }
 
     // ----------------------------------------------------------------------
-    
+
     /**
      * Disable Extension
      *
@@ -372,7 +384,7 @@ class Publisher_low_search_ext {
                      ->where('publisher_lang_id !=', $this->EE->publisher_lib->default_lang_id)
                      ->delete('low_search_indexes');
 
-        if ($this->EE->db->table_exists($this->table) AND $this->EE->db->field_exists('publisher_lang_id', $this->table)) 
+        if ($this->EE->db->table_exists($this->table) AND $this->EE->db->field_exists('publisher_lang_id', $this->table))
         {
             $this->EE->dbforge->drop_column($this->table, 'publisher_status');
             $this->EE->dbforge->drop_column($this->table, 'publisher_lang_id');
@@ -395,8 +407,8 @@ class Publisher_low_search_ext {
         {
             return FALSE;
         }
-    }   
-    
+    }
+
     // ----------------------------------------------------------------------
 }
 
