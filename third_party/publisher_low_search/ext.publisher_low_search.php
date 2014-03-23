@@ -412,5 +412,5 @@ class Publisher_low_search_ext {
     // ----------------------------------------------------------------------
 }
 
-/* End of file ext.navee_publisher.php */
-/* Location: /system/expressionengine/third_party/navee_publisher/ext.navee_publisher.php */
+/* End of file ext.publisher_low_search.php */
+/* Location: /system/expressionengine/third_party/publisher_low_search/ext.publisher_low_search.php */
