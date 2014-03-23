@@ -1,27 +1,39 @@
-<?php  if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * ExpressionEngine - by EllisLab
+ * ExpressionEngine Publisher Low Search Extension Class
  *
  * @package     ExpressionEngine
- * @author      ExpressionEngine Dev Team
- * @copyright   Copyright (c) 2003 - 2011, EllisLab, Inc.
- * @license     http://expressionengine.com/user_guide/license.html
- * @link        http://expressionengine.com
- * @since       Version 2.0
- * @filesource
- */
-
-// ------------------------------------------------------------------------
-
-/**
- * Low Search Publisher Support Extension
- *
- * @package     ExpressionEngine
- * @subpackage  Addons
- * @category    Extension
+ * @subpackage  Extension
+ * @category    Publisher
  * @author      Brian Litzinger
- * @link        http://boldminded.com
+ * @copyright   Copyright (c) 2012, 2013 - Brian Litzinger
+ * @link        http://boldminded.com/add-ons/publisher
+ * @license
+ *
+ * Copyright (c) 2012, 2013. BoldMinded, LLC
+ * All rights reserved.
+ *
+ * This source is commercial software. Use of this software requires a
+ * site license for each domain it is used on. Use of this software or any
+ * of its source code without express written permission in the form of
+ * a purchased commercial or other license is prohibited.
+ *
+ * THIS CODE AND INFORMATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY
+ * KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
+ * PARTICULAR PURPOSE.
+ *
+ * As part of the license agreement for this software, all modifications
+ * to this source must be submitted to the original author for review and
+ * possible inclusion in future releases. No compensation will be provided
+ * for patches, although where possible we will attribute each contribution
+ * in file revision notes. Submitting such modifications constitutes
+ * assignment of copyright to the original author (Brian Litzinger and
+ * BoldMinded, LLC) for such modifications. If you do not wish to assign
+ * copyright to the original author, your license to  use and modify this
+ * source is null and void. Use of this software constitutes your agreement
+ * to this clause.
  */
 
 class Publisher_low_search_ext {
