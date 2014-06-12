@@ -176,7 +176,7 @@ class Publisher_low_search_ext {
             }
         }
 
-        // ee()->publisher_log->to_file($entries);
+        ee()->publisher_log->to_file($entries);
 
         return $entries;
     }
@@ -202,8 +202,8 @@ class Publisher_low_search_ext {
         // --------------------------------------
 
         $ok     = FALSE;
-        $select = array('c.*');
-        $joins  = array();
+        $select = array('c.*', 'fd.*');
+        $joins  = array(array('category_field_data fd', 'c.cat_id = fd.cat_id', 'left'));
         $where  = array();
 
         if (is_array($entry_ids) && ! empty($entry_ids))
@@ -211,7 +211,7 @@ class Publisher_low_search_ext {
             // Option 1: get categories by given entry_ids
             $ok = TRUE;
             $select[] = 'cp.entry_id';
-            $joins[] = array('category_posts cp', 'c.cat_id = cp.cat_id', 'inner');
+            $joins[] = array('publisher_category_posts cp', 'c.cat_id = cp.cat_id AND c.publisher_lang_id = cp.publisher_lang_id', 'inner');
             $where['cp.entry_id'] = $entry_ids;
         }
         elseif (is_array($cat_ids) && ! empty($cat_ids))
@@ -243,10 +243,12 @@ class Publisher_low_search_ext {
             ee()->db->where_in($key, $val);
         }
 
-        // Execute query
-        $query = ee()->db->get();
+        $sql = ee()->db->_compile_select();
+        ee()->db->_reset_select();
 
-        // ee()->publisher_log->to_file(ee()->db->last_query());
+        // ee()->publisher_log->to_file($sql);
+        // return;
+
         $languages = ee()->publisher_model->languages;
 
         // --------------------------------------
@@ -256,40 +258,41 @@ class Publisher_low_search_ext {
         // Relevant non-custom fields
         $fields = array('cat_name', 'cat_description');
 
-        foreach ($query->result_array() AS $row)
+        foreach ($languages as $lang_id => $language)
         {
-            // Loop through each result and populate the output
-            foreach ($row AS $key => $val)
+            foreach (array(PUBLISHER_STATUS_OPEN, PUBLISHER_STATUS_DRAFT) as $status)
             {
-                // Skip non-valid fields
-                if ( ! in_array($key, $fields) && ! preg_match('/^field_id_(\d+)$/', $key, $match)) continue;
+                $query = ee()->publisher_query->modify(
+                    'WHERE',
+                    ' WHERE cp.publisher_lang_id = 1 AND cp.publisher_status = \''. $status .'\' AND',
+                    $sql
+                );
 
-                // We're OK! Go on with composing the right key:
-                // Either the name or description or custom field ID
-                $cat_field = $match ? $match[1] : $key;
-
-                foreach (array(PUBLISHER_STATUS_OPEN, PUBLISHER_STATUS_DRAFT) as $status)
+                foreach ($query->result_array() AS $row)
                 {
-                    $category = ee()->publisher_category->get_translations($row['cat_id'], $row['group_id'], $status);
-
-                    // ee()->publisher_log->to_file('========== $category ==========');
-                    // ee()->publisher_log->to_file($category);
-
-                    foreach ($languages as $lang_id => $language)
+                    // Loop through each result and populate the output
+                    foreach ($row AS $key => $val)
                     {
-                        $val = isset($category[$lang_id]->$cat_field) ? $category[$lang_id]->$cat_field : FALSE;
+                        // Skip non-valid fields
+                        if ( ! in_array($key, $fields) && ! preg_match('/^field_id_(\d+)$/', $key, $match)) continue;
 
+                        // We're OK! Go on with composing the right key:
+                        // Either the name or description or custom field ID
+                        $cat_field = $match ? 'field_id_'.$match[1] : $key;
+
+                        // ee()->publisher_log->to_file('========== $category ==========');
                         // ee()->publisher_log->to_file($val);
 
-                        // Use that as the key in the array to return
-                        if ($val)
-                        {
-                            $cats[$row['entry_id']]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
-                        }
+                        $cats[$row['entry_id']]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
                     }
                 }
+
             }
         }
+
+        // ee()->publisher_log->to_file($cats);
+
+        ee()->db->_reset_select();
 
         // --------------------------------------
         // Focus on the single one if one entry_id is given
