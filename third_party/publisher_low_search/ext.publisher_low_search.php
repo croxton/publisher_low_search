@@ -170,13 +170,22 @@ class Publisher_low_search_ext {
         if ($entry_cats = $this->get_entry_categories($entries))
         {
             // add the categories to the index_entries rows
-            foreach ($entry_cats AS $entry_id => $cats)
+            foreach ($entry_cats as $c_entry_id => $cat)
             {
-                $entries[$entry_id] += $cats;
+                foreach ($entries as $entry)
+                {
+                    if (
+                        $entry['entry_id'] == $cat['entry_id'] &&
+                        $entry['publisher_lang_id'] == $cat['publisher_lang_id'] &&
+                        $entry['publisher_status'] == $cat['publisher_status']
+                    ){
+                        $entries[$entry['entry_id']] += $cat;
+                    }
+                }
             }
         }
 
-        ee()->publisher_log->to_file($entries);
+        // ee()->publisher_log->to_file($entries);
 
         return $entries;
     }
@@ -231,14 +240,14 @@ class Publisher_low_search_ext {
         ee()->db->from('publisher_categories c');
 
         // Process joins
-        foreach ($joins AS $join)
+        foreach ($joins as $join)
         {
             list($table, $on, $type) = $join;
             ee()->db->join($table, $on, $type);
         }
 
         // Process wheres
-        foreach ($where AS $key => $val)
+        foreach ($where as $key => $val)
         {
             ee()->db->where_in($key, $val);
         }
@@ -268,10 +277,12 @@ class Publisher_low_search_ext {
                     $sql
                 );
 
-                foreach ($query->result_array() AS $row)
+                foreach ($query->result_array() as $row)
                 {
+                    $cat_data = array();
+
                     // Loop through each result and populate the output
-                    foreach ($row AS $key => $val)
+                    foreach ($row as $key => $val)
                     {
                         // Skip non-valid fields
                         if ( ! in_array($key, $fields) && ! preg_match('/^field_id_(\d+)$/', $key, $match)) continue;
@@ -283,14 +294,20 @@ class Publisher_low_search_ext {
                         // ee()->publisher_log->to_file('========== $category ==========');
                         // ee()->publisher_log->to_file($val);
 
-                        $cats[$row['entry_id']]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
+                        $cat_data[$row['entry_id']]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
                     }
-                }
 
+                    $cats[] = array(
+                        'entry_id' => $row['entry_id'],
+                        'publisher_lang_id' => $lang_id,
+                        'publisher_status' => $status,
+                        'data' => $cat_data
+                    );
+                }
             }
         }
 
-        // ee()->publisher_log->to_file($cats);
+        ee()->publisher_log->to_file($cats);
 
         ee()->db->_reset_select();
 
