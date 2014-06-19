@@ -169,34 +169,28 @@ class Publisher_low_search_ext {
 
         if ($entry_cats = $this->get_entry_categories($entries))
         {
-            // ee()->publisher_log->to_file($cat_data);
-            // add the categories to the index_entries rows
-            foreach ($entry_cats as $entry_id => $entry_data)
+            foreach ($entries as $index => $entry)
             {
-                foreach ($entry_data as $lang_id => $lang_data)
+                foreach ($entry_cats as $entry_id => $cat_entry_data)
                 {
-                    foreach ($lang_data as $status => $cat_data)
+                    foreach ($cat_entry_data as $lang_id => $lang_data)
                     {
-                        // ee()->publisher_log->to_file($cat_data);
-                        $entries[$entry_id] += $cat_data;
+                        foreach ($lang_data as $status => $cat_data)
+                        {
+                            if (
+                                $entry_id == $entry['entry_id'] &&
+                                $lang_id == $entry['publisher_lang_id'] &&
+                                $status == $entry['publisher_status']
+                            ){
+                                $entries[$index] += $cat_data;
+                            }
+                        }
                     }
                 }
-
-
-                // foreach ($entries as $entry)
-                // {
-                //     if (
-                //         $entry['entry_id'] == $cat['entry_id'] &&
-                //         $entry['publisher_lang_id'] == $cat['publisher_lang_id'] &&
-                //         $entry['publisher_status'] == $cat['publisher_status']
-                //     ){
-                //         $entries[$entry['entry_id']] += $cat;
-                //     }
-                // }
             }
         }
 
-        ee()->publisher_log->to_file($entries);
+        // ee()->publisher_log->to_file($entries);
 
         return $entries;
     }
@@ -222,8 +216,13 @@ class Publisher_low_search_ext {
         // --------------------------------------
 
         $ok     = FALSE;
-        $select = array('c.*', 'fd.*');
-        $joins  = array(array('category_field_data fd', 'c.cat_id = fd.cat_id', 'left'));
+        $select = array('cp.*', 'c.*', 'fd.*');
+        $joins  = array(
+            array('exp_categories c', 'c.cat_id = cp.cat_id', 'left'),
+            array('exp_category_field_data fd', 'c.cat_id = fd.cat_id', 'left'),
+            array('exp_publisher_categories pc', 'pc.cat_id = cp.cat_id', 'left outer')
+
+        );
         $where  = array();
 
         if (is_array($entry_ids) && ! empty($entry_ids))
@@ -231,7 +230,6 @@ class Publisher_low_search_ext {
             // Option 1: get categories by given entry_ids
             $ok = TRUE;
             $select[] = 'cp.entry_id';
-            $joins[] = array('publisher_category_posts cp', 'c.cat_id = cp.cat_id AND c.publisher_lang_id = cp.publisher_lang_id', 'inner');
             $where['cp.entry_id'] = $entry_ids;
         }
         elseif (is_array($cat_ids) && ! empty($cat_ids))
@@ -248,7 +246,7 @@ class Publisher_low_search_ext {
 
         // Start query
         ee()->db->select($select, FALSE);
-        ee()->db->from('publisher_categories c');
+        ee()->db->from('publisher_category_posts cp');
 
         // Process joins
         foreach ($joins as $join)
@@ -266,8 +264,29 @@ class Publisher_low_search_ext {
         $sql = ee()->db->_compile_select();
         ee()->db->_reset_select();
 
-        ee()->publisher_log->to_file($sql);
-        // return;
+        $sql .= ' GROUP BY `cp`.`entry_id`, `cp`.`cat_id`, `cp`.`publisher_lang_id`, `cp`.`publisher_status`';
+
+        // ee()->publisher_log->to_file($sql);
+        /*
+
+        // Original
+        SELECT c.*, fd.*, cp.entry_id
+        FROM (`exp_publisher_categories` c)
+        LEFT JOIN `exp_category_field_data` fd ON `c`.`cat_id` = `fd`.`cat_id`
+        INNER JOIN `exp_publisher_category_posts` cp ON `c`.`cat_id` = `cp`.`cat_id` AND c.publisher_lang_id = cp.publisher_lang_id
+        WHERE `cp`.`entry_id` IN (19)
+
+        // What we need for Publisher data
+        SELECT cp.*, c.*, fd.*, cp.entry_id
+        FROM (`exp_publisher_category_posts` cp)
+        LEFT JOIN `exp_categories` c ON `c`.`cat_id` = `cp`.`cat_id`
+        LEFT JOIN `exp_publisher_categories` pc ON `pc`.`cat_id` = `cp`.`cat_id`
+        LEFT OUTER JOIN `exp_category_field_data` fd ON `c`.`cat_id` = `fd`.`cat_id`
+            AND pc.publisher_lang_id = cp.publisher_lang_id
+            AND pc.publisher_status = cp.publisher_status
+        WHERE `cp`.`entry_id` IN (19....)
+        GROUP BY `cp`.`entry_id`, `cp`.`cat_id`, `cp`.`publisher_lang_id`, `cp`.`publisher_status`;
+         */
 
         $languages = ee()->publisher_model->languages;
 
@@ -284,7 +303,7 @@ class Publisher_low_search_ext {
             {
                 $query = ee()->publisher_query->modify(
                     'WHERE',
-                    ' WHERE cp.publisher_lang_id = '. $lang_id .' AND cp.publisher_status = \''. $status .'\' AND',
+                    ' AND cp.publisher_lang_id = '. $lang_id .' AND cp.publisher_status = \''. $status .'\' WHERE',
                     $sql
                 );
 
@@ -300,15 +319,11 @@ class Publisher_low_search_ext {
                         // Either the name or description or custom field ID
                         $cat_field = $match ? 'field_id_'.$match[1] : $key;
 
-                        // $cat_data[$row['entry_id']]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
-
                         $cats[$row['entry_id']][$lang_id][$status]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
                     }
                 }
             }
         }
-
-        // ee()->publisher_log->to_file($cat_data);
 
         ee()->db->_reset_select();
 
