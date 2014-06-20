@@ -173,18 +173,18 @@ class Publisher_low_search_ext {
             {
                 foreach ($entry_cats as $entry_id => $cat_entry_data)
                 {
-                    foreach ($cat_entry_data as $lang_id => $lang_data)
+                    foreach ($cat_entry_data as $lang_id => $cat_data)
                     {
-                        foreach ($lang_data as $status => $cat_data)
-                        {
+                        // foreach ($lang_data as $status => $cat_data)
+                        // {
                             if (
                                 $entry_id == $entry['entry_id'] &&
-                                $lang_id == $entry['publisher_lang_id'] &&
-                                $status == $entry['publisher_status']
+                                $lang_id == $entry['publisher_lang_id']
+                                // && $status == $entry['publisher_status']
                             ){
                                 $entries[$index] += $cat_data;
                             }
-                        }
+                        // }
                     }
                 }
             }
@@ -207,7 +207,12 @@ class Publisher_low_search_ext {
     {
         // Prep output
         $cats = array();
-        $entry_ids = array_keys($entries);
+        $entry_ids = array();
+
+        foreach ($entries as $entry)
+        {
+            $entry_ids[] = $entry["entry_id"];
+        }
 
         // --------------------------------------
         // Two options: either get cats by their entry id,
@@ -299,11 +304,11 @@ class Publisher_low_search_ext {
 
         foreach ($languages as $lang_id => $language)
         {
-            foreach (array(PUBLISHER_STATUS_OPEN, PUBLISHER_STATUS_DRAFT) as $status)
-            {
+            // foreach (array(PUBLISHER_STATUS_OPEN, PUBLISHER_STATUS_DRAFT) as $status)
+            // {
                 $query = ee()->publisher_query->modify(
                     'WHERE',
-                    ' AND cp.publisher_lang_id = '. $lang_id .' AND cp.publisher_status = \''. $status .'\' WHERE',
+                    ' AND cp.publisher_lang_id = '. $lang_id .' AND cp.publisher_status = \''. PUBLISHER_STATUS_OPEN .'\' WHERE',
                     $sql
                 );
 
@@ -319,10 +324,11 @@ class Publisher_low_search_ext {
                         // Either the name or description or custom field ID
                         $cat_field = $match ? 'field_id_'.$match[1] : $key;
 
-                        $cats[$row['entry_id']][$lang_id][$status]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
+                        // $cats[$row['entry_id']][$lang_id][$status]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
+                        $cats[$row['entry_id']][$lang_id]["{$row['group_id']}:{$cat_field}"][$row['cat_id']] = $val;
                     }
                 }
-            }
+            // }
         }
 
         ee()->db->_reset_select();
