@@ -43,7 +43,7 @@ class Publisher_low_search_ext {
     public $docs_url        = '';
     public $name            = 'Publisher - Low Search Support';
     public $settings_exist  = 'n';
-    public $version         = '1.0.4';
+    public $version         = '1.0.5';
 
     private $table          = 'low_search_indexes';
     private $EE;
