@@ -434,15 +434,23 @@ class Publisher_low_search_ext {
         $this->EE->db->where('class', __CLASS__);
         $this->EE->db->delete('extensions');
 
-        $this->EE->db->where('publisher_status !=', PUBLISHER_STATUS_OPEN)
-                     ->where('publisher_lang_id !=', $this->EE->publisher_lib->default_lang_id)
+        // Delete non-default language & open indexes
+        $this->EE->db->where('publisher_lang_id !=', $this->EE->publisher_lib->default_lang_id)
                      ->delete('low_search_indexes');
 
+        $this->EE->db->where('publisher_status', PUBLISHER_STATUS_DRAFT)
+                     ->delete('low_search_indexes');
+
+        // Drop our columns
         if ($this->EE->db->table_exists($this->table) AND $this->EE->db->field_exists('publisher_lang_id', $this->table))
         {
             $this->EE->dbforge->drop_column($this->table, 'publisher_status');
             $this->EE->dbforge->drop_column($this->table, 'publisher_lang_id');
         }
+
+        // Finally, reset the original primary keys.
+        $this->EE->db->query("ALTER TABLE `{$this->EE->db->dbprefix}{$this->table}` DROP PRIMARY KEY");
+        $this->EE->db->query("ALTER TABLE `{$this->EE->db->dbprefix}{$this->table}` ADD PRIMARY KEY (collection_id, entry_id)");
     }
 
     // ----------------------------------------------------------------------
