@@ -88,6 +88,13 @@ class Publisher_low_search_ext {
 
     public function low_search_pre_search($params)
     {
+        // -------------------------------------------
+        // Get the latest version of $params
+        // -------------------------------------------
+        if (ee()->extensions->last_call !== FALSE)
+        {
+            $params = ee()->extensions->last_call;
+        }
         $params['add_to_query'] = array(
             'publisher_lang_id' => $this->EE->publisher_lib->lang_id,
             'publisher_status'  => $this->EE->publisher_lib->status
